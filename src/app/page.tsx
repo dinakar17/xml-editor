@@ -1,25 +1,26 @@
 'use client';
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Download, FileText, Info, Save, AlertCircle, CheckCircle, X, Plus, Trash2, Edit } from 'lucide-react';
 
 const XMLEditor = () => {
-  const [xmlData, setXmlData] = useState(null);
-  const [selectedElement, setSelectedElement] = useState(null);
-  const [selectedAttribute, setSelectedAttribute] = useState(null);
+  const [xmlData, setXmlData] = useState<any>(null);
+  const [selectedElement, setSelectedElement] = useState<any>(null);
+  const [selectedAttribute, setSelectedAttribute] = useState<any>(null);
   const [fileName, setFileName] = useState('');
-  const [parameterDescriptions, setParameterDescriptions] = useState({});
+  const [parameterDescriptions, setParameterDescriptions] = useState<any>({});
   const [isLoadingDescriptions, setIsLoadingDescriptions] = useState(true);
   const [descriptionsError, setDescriptionsError] = useState<string | null>(null);
   const [descriptionsSource, setDescriptionsSource] = useState('');
-  const [showJsonUpload, setShowJsonUpload] = useState(false);
-  const [showAddElement, setShowAddElement] = useState(false);
-  const [showAddAttribute, setShowAddAttribute] = useState(false);
-  const [newElementTagName, setNewElementTagName] = useState('');
-  const [newElementTextContent, setNewElementTextContent] = useState('');
-  const [newAttrName, setNewAttrName] = useState('');
-  const [newAttrValue, setNewAttrValue] = useState('');
-  const fileInputRef = useRef(null);
-  const jsonInputRef = useRef(null);
+  const [showJsonUpload, setShowJsonUpload] = useState<boolean>(false);
+  const [showAddElement, setShowAddElement] = useState<any>(false);
+  const [showAddAttribute, setShowAddAttribute] = useState<any>(false);
+  const [newElementTagName, setNewElementTagName] = useState<string>('');
+  const [newElementTextContent, setNewElementTextContent] = useState<string>('');
+  const [newAttrName, setNewAttrName] = useState<string>('');
+  const [newAttrValue, setNewAttrValue] = useState<string>('');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const jsonInputRef = useRef<HTMLInputElement | null>(null);
 
   // Load parameter descriptions from environment variable on mount
   useEffect(() => {
@@ -57,20 +58,20 @@ const XMLEditor = () => {
   }, []);
 
   // Handle manual JSON file upload
-  const handleJsonUpload = (event) => {
-    const file = event.target.files[0];
+  const handleJsonUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     
-    reader.onload = (e) => {
+    reader.onload = (e: any) => {
       try {
         const descriptions = JSON.parse(e.target.result);
         setParameterDescriptions(descriptions);
         setDescriptionsError(null);
         setDescriptionsSource('manual');
         setShowJsonUpload(false);
-      } catch (error) {
+      } catch (error: any) {
         alert('Error parsing JSON file: ' + error.message);
       }
     };
@@ -79,7 +80,7 @@ const XMLEditor = () => {
   };
 
   // Simple XML parser function
-  const parseXML = (xmlString) => {
+  const parseXML = (xmlString: string) => {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
     
@@ -92,33 +93,33 @@ const XMLEditor = () => {
   };
 
   // Convert XML element to JSON-like structure
-  const xmlToObject = (element) => {
-    const obj = {
+  const xmlToObject = (element: Element) => {
+    const obj : any = {
       tagName: element.tagName,
-      attributes: {},
+      attributes: {} as { [key: string]: string },
       children: [],
       textContent: element.textContent?.trim() || ''
     };
 
-    for (let attr of element.attributes) {
+    for (const attr of element.attributes) {
       obj.attributes[attr.name] = attr.value;
     }
 
-    for (let child of element.children) {
+    for (const child of element.children) {
       obj.children.push(xmlToObject(child));
     }
 
     return obj;
   };
 
-  const handleXmlUpload = (event) => {
-    const file = event.target.files[0];
+  const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
     setFileName(file.name);
     const reader = new FileReader();
     
-    reader.onload = (e) => {
+    reader.onload = (e: any) => {
       try {
         const xmlDoc = parseXML(e.target.result);
         const rootElement = xmlDoc.documentElement;
@@ -126,7 +127,7 @@ const XMLEditor = () => {
         setXmlData(xmlObject);
         setSelectedElement(null);
         setSelectedAttribute(null);
-      } catch (error) {
+      } catch (error: any) {
         alert('Error parsing XML: ' + error.message);
       }
     };
@@ -135,7 +136,7 @@ const XMLEditor = () => {
   };
 
   // Convert object back to XML string
-  const objectToXML = (obj, depth = 0) => {
+  const objectToXML = (obj: any, depth = 0) => {
     const indent = '  '.repeat(depth);
     let xml = `${indent}<${obj.tagName}`;
     
@@ -181,8 +182,8 @@ const XMLEditor = () => {
   };
 
   // Update element in nested structure
-  const updateElement = (elementPath, updates) => {
-    const updateNestedObject = (obj, path, newData) => {
+  const updateElement = (elementPath: number[], updates: Partial<Element>) => {
+    const updateNestedObject = (obj: any, path: number[], newData: Partial<Element>) => {
       if (path.length === 0) {
         return { ...obj, ...newData };
       }
@@ -190,7 +191,7 @@ const XMLEditor = () => {
       const [currentIndex, ...remainingPath] = path;
       return {
         ...obj,
-        children: obj.children.map((child, index) => 
+        children: obj.children.map((child: any, index: number) => 
           index === currentIndex 
             ? updateNestedObject(child, remainingPath, newData)
             : child
@@ -202,8 +203,8 @@ const XMLEditor = () => {
   };
 
   // Add new element
-  const addElement = (parentPath, newElement) => {
-    const addToNestedObject = (obj, path, element) => {
+  const addElement = (parentPath: number[], newElement: any) => {
+    const addToNestedObject = (obj: any, path: number[], element: any) => {
       if (path.length === 0) {
         return {
           ...obj,
@@ -214,7 +215,7 @@ const XMLEditor = () => {
       const [currentIndex, ...remainingPath] = path;
       return {
         ...obj,
-        children: obj.children.map((child, index) => 
+        children: obj.children.map((child: any, index: number) => 
           index === currentIndex 
             ? addToNestedObject(child, remainingPath, element)
             : child
@@ -226,20 +227,20 @@ const XMLEditor = () => {
   };
 
   // Delete element
-  const deleteElement = (elementPath) => {
-    const deleteFromNestedObject = (obj, path) => {
+  const deleteElement = (elementPath: number[]) => {
+    const deleteFromNestedObject = (obj: any, path: number[]) => {
       if (path.length === 1) {
         const indexToDelete = path[0];
         return {
           ...obj,
-          children: obj.children.filter((_, index) => index !== indexToDelete)
+          children: obj.children.filter((_: any, index: number) => index !== indexToDelete)
         };
       }
       
       const [currentIndex, ...remainingPath] = path;
       return {
         ...obj,
-        children: obj.children.map((child, index) => 
+        children: obj.children.map((child: any, index: number) => 
           index === currentIndex 
             ? deleteFromNestedObject(child, remainingPath)
             : child
@@ -250,7 +251,7 @@ const XMLEditor = () => {
     setXmlData(deleteFromNestedObject(xmlData, elementPath));
   };
 
-  const updateAttribute = (elementPath, attributeName, newValue) => {
+  const updateAttribute = (elementPath: number[], attributeName: string, newValue: string) => {
     const updates = {
       attributes: {
         ...getElementByPath(xmlData, elementPath).attributes,
@@ -260,7 +261,7 @@ const XMLEditor = () => {
     updateElement(elementPath, updates);
   };
 
-  const addAttribute = (elementPath, attributeName, attributeValue) => {
+  const addAttribute = (elementPath: number[], attributeName: string, attributeValue: string) => {
     const element = getElementByPath(xmlData, elementPath);
     const updates = {
       attributes: {
@@ -271,7 +272,7 @@ const XMLEditor = () => {
     updateElement(elementPath, updates);
   };
 
-  const deleteAttribute = (elementPath, attributeName) => {
+  const deleteAttribute = (elementPath: number[], attributeName: string) => {
     const element = getElementByPath(xmlData, elementPath);
     const newAttributes = { ...element.attributes };
     delete newAttributes[attributeName];
@@ -283,7 +284,7 @@ const XMLEditor = () => {
   };
 
   // Helper function to get element by path
-  const getElementByPath = (obj, path) => {
+  const getElementByPath = (obj: any, path: number[]) => {
     let current = obj;
     for (const index of path) {
       current = current.children[index];
@@ -291,7 +292,7 @@ const XMLEditor = () => {
     return current;
   };
 
-  const renderElement = (element, path = []) => {
+  const renderElement = (element: any, path: number[] = []) => {
     // Skip DataIdentifier elements as requested
     if (element.tagName === 'DataIdentifier') {
       return null;
@@ -363,7 +364,7 @@ const XMLEditor = () => {
                     className="text-sm text-gray-800 truncate cursor-pointer hover:bg-gray-200 px-1 rounded flex-1"
                     onClick={() => setSelectedAttribute({ elementPath: path, attributeName: key, value })}
                   >
-                    {value}
+                    {String(value)}
                   </span>
                   {parameterDescriptions[key] && (
                     <Info className="w-3 h-3 text-blue-500 flex-shrink-0" />
@@ -392,9 +393,9 @@ const XMLEditor = () => {
           )}
         </div>
         
-        {element.children.length > 0 && (
+        {element.children && element.children.length > 0 && (
           <div className="ml-4 mt-2">
-            {element.children.map((child, index) => 
+            {element.children.map((child: any, index: number) => 
               renderElement(child, [...path, index])
             )}
           </div>
@@ -455,7 +456,7 @@ const XMLEditor = () => {
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
               >
-                {description.options.map(option => (
+                {description.options.map((option: any) => (
                   <option key={option} value={option}>{option}</option>
                 ))}
               </select>
