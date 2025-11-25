@@ -1,0 +1,267 @@
+{
+  "Did__hex": {
+    "title": "Data Identifier (DID)",
+    "description": "Unique hexadecimal identifier for the diagnostic parameter. Must be in format 0xXXXX. This identifier is used by diagnostic tools to request specific data from the ECU.",
+    "type": "hex",
+    "example": "0xF187"
+  },
+  "Conv_Rule": {
+    "title": "Conversion Rule",
+    "description": "Defines how the raw data should be interpreted and converted for display. ASCII for text data, VALUE for numeric data with scaling, ENUM for predefined value mappings.",
+    "type": "enum",
+    "options": ["ASCII", "VALUE", "ENUM"],
+    "example": "VALUE"
+  },
+  "size_Bytes": {
+    "title": "Data Size",
+    "description": "Size of the parameter data in bytes. Determines how much data to read from the ECU. Common sizes are 1, 2, 4, or 8 bytes.",
+    "type": "number",
+    "example": "4"
+  },
+  "Desc": {
+    "title": "Parameter Description",
+    "description": "Human-readable description of what this parameter represents. Should be descriptive enough for technicians to understand the parameter's purpose.",
+    "type": "text",
+    "example": "MCU_Assembly_part_number"
+  },
+  "Unit": {
+    "title": "Measurement Unit",
+    "description": "The unit of measurement for this parameter (e.g., V for volts, mA for milliamps, Celsius for temperature, RPM for rotational speed). Use 'NONE' if the parameter has no unit.",
+    "type": "text",
+    "example": "mV"
+  },
+  "scaling": {
+    "title": "Scaling Factor",
+    "description": "Multiplier applied to raw values to get the actual measurement. For example, 0.001 converts millivolts to volts. Use 'NONE' for no scaling (ASCII/ENUM types).",
+    "type": "text",
+    "example": "0.001"
+  },
+  "Offset": {
+    "title": "Offset Value",
+    "description": "Value added to the scaled result. Used for parameters that don't start at zero or need baseline adjustment. Use 'NONE' for no offset.",
+    "type": "text",
+    "example": "0"
+  },
+  "Enum_List": {
+    "title": "Enumeration List",
+    "description": "Comma-separated list of value mappings for ENUM type parameters. Format: 'value=description,value=description'. Use 'NONE' for non-enum parameters.",
+    "type": "text",
+    "example": "0=INIT,1=SPEED,2=TORQUE,3=STANDBY,4=ERROR"
+  },
+  "AccessPvg": {
+    "title": "Access Privilege",
+    "description": "Defines whether the parameter can be read only or both read and written. READ-only parameters are for monitoring, READ/WRITE parameters can be configured.",
+    "type": "enum",
+    "options": ["READ", "READ/WRITE"],
+    "example": "READ"
+  },
+  "Group_ID": {
+    "title": "Parameter Group",
+    "description": "Logical grouping of related parameters for organization and access control. GROUP_A typically contains identification data, GROUP_B contains operational data.",
+    "type": "enum",
+    "options": ["GROUP_A", "GROUP_B", "GROUP_C"],
+    "example": "GROUP_A"
+  },
+  "MemAddrBytes": {
+    "title": "Memory Address Bytes",
+    "description": "Number of bytes used for memory addressing in diagnostic operations. Typically 0 for standard operations, higher values for advanced memory operations.",
+    "type": "number",
+    "example": "0"
+  },
+  "EraseRoutineID": {
+    "title": "Erase Routine ID",
+    "description": "Identifier for the memory erase routine used during ECU reprogramming. 0x0000 indicates no erase routine or default routine.",
+    "type": "hex",
+    "example": "0x0000"
+  },
+  "ChecksumRoutineID": {
+    "title": "Checksum Routine ID",
+    "description": "Identifier for the checksum verification routine used during reprogramming to ensure data integrity. 0x0000 indicates default routine.",
+    "type": "hex",
+    "example": "0x0000"
+  },
+  "XtendedSecurityAlgotype": {
+    "title": "Extended Security Algorithm Type",
+    "description": "Type of security algorithm used for authentication and encryption during diagnostic sessions. Different values represent different security levels and algorithms.",
+    "type": "number",
+    "example": "2"
+  },
+  "XtendedSecurityL3Const": {
+    "title": "Extended Security Level 3 Constant",
+    "description": "Security constant used for Level 3 authentication. This is a cryptographic seed value used in security access algorithms.",
+    "type": "hex",
+    "example": "0x0000009B"
+  },
+  "XtendedSecurityL5Const": {
+    "title": "Extended Security Level 5 Constant",
+    "description": "Security constant used for Level 5 authentication. Higher security level constant for advanced diagnostic operations.",
+    "type": "hex",
+    "example": "0x04C11DB7"
+  },
+  "hexFileNameDID": {
+    "title": "Hex File Name DID",
+    "description": "Data Identifier for retrieving the hex filename used during programming. Useful for tracking software versions and programming history.",
+    "type": "hex",
+    "example": "F111"
+  },
+  "swPartNoDID": {
+    "title": "Software Part Number DID",
+    "description": "Data Identifier for retrieving the software part number. Used for version control and compatibility verification.",
+    "type": "hex",
+    "example": "F181"
+  },
+  "isBalNetEncrypted": {
+    "title": "BalNet Encryption Status",
+    "description": "Indicates whether BalNet communication is encrypted. True enables encryption for secure communication between diagnostic tools and ECU.",
+    "type": "boolean",
+    "options": ["true", "false"],
+    "example": "true"
+  },
+  "isUDSEncrypted": {
+    "title": "UDS Encryption Status",
+    "description": "Indicates whether UDS (Unified Diagnostic Services) communication is encrypted. Affects diagnostic session security.",
+    "type": "boolean",
+    "options": ["true", "false"],
+    "example": "false"
+  },
+  "balnetFingerPrintAddress": {
+    "title": "BalNet Fingerprint Address",
+    "description": "Memory address where the BalNet fingerprint is stored. Used for authentication and security verification.",
+    "type": "hex",
+    "example": "FF006000"
+  },
+  "balnetProgConstant": {
+    "title": "BalNet Programming Constant",
+    "description": "Constant value used in BalNet programming algorithms. Part of the cryptographic protocol for secure programming.",
+    "type": "hex",
+    "example": "4C11DB7"
+  },
+  "balnetFingerPrintSizeInHexFile": {
+    "title": "BalNet Fingerprint Size",
+    "description": "Size of the BalNet fingerprint data in the hex file, specified in bytes. Used for fingerprint validation.",
+    "type": "number",
+    "example": "16"
+  },
+  "balnetVinAddress": {
+    "title": "BalNet VIN Address",
+    "description": "Memory address where the Vehicle Identification Number (VIN) is stored in BalNet protocol.",
+    "type": "hex",
+    "example": "FF000000"
+  },
+  "isBalnetCheckSumPresent": {
+    "title": "BalNet Checksum Present",
+    "description": "Indicates whether checksum verification is enabled for BalNet operations. True enables additional data integrity checking.",
+    "type": "boolean",
+    "options": ["true", "false"],
+    "example": "true"
+  },
+  "timerToWait": {
+    "title": "Timer to Wait",
+    "description": "Timeout value in milliseconds for diagnostic operations. Defines how long to wait for ECU responses before timing out.",
+    "type": "number",
+    "example": "1000"
+  },
+  "isBalFailLog": {
+    "title": "BalNet Failure Logging",
+    "description": "Enables logging of BalNet communication failures. Useful for debugging communication issues and tracking error patterns.",
+    "type": "boolean",
+    "options": ["true", "false"],
+    "example": "true"
+  },
+  "isAppLog": {
+    "title": "Application Logging",
+    "description": "Enables application-level logging for diagnostic operations. Provides detailed logs of diagnostic session activities.",
+    "type": "boolean",
+    "options": ["true", "false"],
+    "example": "true"
+  },
+  "maskDtc": {
+    "title": "DTC Mask",
+    "description": "Mask value for Diagnostic Trouble Code (DTC) operations. Used to filter which DTCs are processed during diagnostic sessions.",
+    "type": "hex",
+    "example": "FF"
+  },
+  "maxTimeFlashReq": {
+    "title": "Maximum Flash Request Time",
+    "description": "Maximum time in seconds allowed for flash programming requests. Prevents excessive wait times during ECU programming.",
+    "type": "number",
+    "example": "48"
+  },
+  "timerToWaitForFlashing": {
+    "title": "Flash Programming Wait Timer",
+    "description": "Timeout value in milliseconds specifically for flash programming operations. Usually longer than standard diagnostic timeouts.",
+    "type": "number",
+    "example": "5000"
+  },
+  "isDTC": {
+    "title": "DTC Operations Enabled",
+    "description": "Enables Diagnostic Trouble Code (DTC) read/clear operations. When true, allows access to stored fault codes in the ECU.",
+    "type": "boolean",
+    "options": ["true", "false"],
+    "example": "true"
+  },
+  "isDID": {
+    "title": "DID Operations Enabled",
+    "description": "Enables Data Identifier (DID) read operations. When true, allows reading of diagnostic data identifiers from the ECU.",
+    "type": "boolean",
+    "options": ["true", "false"],
+    "example": "true"
+  },
+  "isWriteDID": {
+    "title": "DID Write Operations Enabled",
+    "description": "Enables Data Identifier (DID) write operations. When true, allows writing/configuring diagnostic parameters in the ECU.",
+    "type": "boolean",
+    "options": ["true", "false"],
+    "example": "true"
+  },
+  "isReprograming": {
+    "title": "Reprogramming Enabled",
+    "description": "Enables ECU reprogramming functionality. When true, allows flashing new software to the ECU.",
+    "type": "boolean",
+    "options": ["true", "false"],
+    "example": "false"
+  },
+  "isAnalyticsGraph": {
+    "title": "Analytics Graph Enabled",
+    "description": "Enables analytics and graphing functionality for diagnostic data. When true, allows real-time data visualization.",
+    "type": "boolean",
+    "options": ["true", "false"],
+    "example": "false"
+  },
+  "isActuatorRoutines": {
+    "title": "Actuator Routines Enabled",
+    "description": "Enables actuator test routines. When true, allows activation of ECU outputs for testing purposes (motors, solenoids, etc.).",
+    "type": "boolean",
+    "options": ["true", "false"],
+    "example": "false"
+  },
+  "isBootReprograming": {
+    "title": "Boot Reprogramming Enabled",
+    "description": "Enables bootloader reprogramming functionality. When true, allows updating the ECU's bootloader software.",
+    "type": "boolean",
+    "options": ["true", "false"],
+    "example": "false"
+  },
+  "isSpecialOperation": {
+    "title": "Special Operations Enabled",
+    "description": "Enables special diagnostic operations beyond standard UDS services. When true, allows access to manufacturer-specific functions.",
+    "type": "boolean",
+    "options": ["true", "false"],
+    "example": "false"
+  },
+  "shouldWriteMotorType": {
+    "title": "Motor Type Writing Enabled",
+    "description": "Enables writing motor type identification parameters. When true, allows configuration of motor type settings in the ECU.",
+    "type": "boolean",
+    "options": ["true", "false"],
+    "example": "false"
+  },
+  "bmsWattVendorCode": {
+    "title": "BMS Watt Vendor Code",
+    "description": "Three-character vendor code for BMS Watt identification. Must be exactly 3 characters in length.",
+    "type": "text",
+    "example": "ABC",
+    "maxLength": 3,
+    "minLength": 3
+  }
+}
