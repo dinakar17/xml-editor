@@ -22,6 +22,11 @@ const XMLElement: React.FC<XMLElementProps> = ({
   onShowAddAttribute,
   onShowAddElement,
 }) => {
+  // Skip comment nodes - don't display them
+  if (element.tagName === '__COMMENT__') {
+    return null;
+  }
+  
   const [isCollapsed, setIsCollapsed] = useState(false);
   const hasAttributes = Object.keys(element.attributes).length > 0;
   const hasChildren = element.children && element.children.length > 0;

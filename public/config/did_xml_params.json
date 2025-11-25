@@ -258,10 +258,26 @@
   },
   "bmsWattVendorCode": {
     "title": "BMS Watt Vendor Code",
-    "description": "Three-character vendor code for BMS Watt identification. Must be exactly 3 characters in length.",
+    "description": "Three-character vendor code for BMS identification (e.g., B09). The first character represents the battery kWh capacity, and the third character represents the manufacturer. This code is used to validate flashing by comparing against the BIN number fetched from the vehicle to ensure compatibility.",
     "type": "text",
-    "example": "ABC",
+    "example": "B09",
     "maxLength": 3,
     "minLength": 3
+  },
+  "bin_first_char": {
+    "title": "BIN First Character (Deprecated)",
+    "description": "DEPRECATED: First character of the Battery Identification Number (BIN). This character identifies the energy variant of the pack. This parameter is deprecated and has no effect on current operations.",
+    "type": "text",
+    "example": "B",
+    "maxLength": 1,
+    "minLength": 1
+  },
+  "bin_third_char": {
+    "title": "BIN Third Character (Deprecated)",
+    "description": "DEPRECATED: Third character of the Battery Identification Number (BIN). This character identifies the cell variant. This parameter is deprecated and has no effect on current operations.",
+    "type": "text",
+    "example": "9",
+    "maxLength": 1,
+    "minLength": 1
   }
 }

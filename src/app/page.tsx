@@ -8,7 +8,7 @@ import AddElementDialog from '@/components/AddElementDialog';
 import AddAttributeDialog from '@/components/AddAttributeDialog';
 import AttributeEditor from '@/components/AttributeEditor';
 import XMLElement from '@/components/XMLElement';
-import { parseXML, xmlToObject, objectToXML, getElementByPath } from '@/utils/xmlUtils';
+import { parseXML, xmlDocumentToObject, objectToXML, getElementByPath } from '@/utils/xmlUtils';
 
 interface XMLFile {
   id: string;
@@ -39,15 +39,61 @@ const XMLEditor = () => {
   useEffect(() => {
     const loadParameterDescriptions = async () => {
       try {
-        const response = await fetch('/config/did_xml_params.json');
-        if (!response.ok) {
-          throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+        // First, get the file link from the API
+        const folderPath = encodeURIComponent('/BALNOSTICS/XMLEditor');
+        const folderResponse = await fetch(`https://abdrive.bajajauto.com/secure/user/file/download?folder_path=${folderPath}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': 'Bearer $2y$10$cHek8vAlpqqGKgZi1dA7/OEwq1gM9JPVV9QWg3h7TfEoNXct6XS8S'
+          }
+        });
+
+        if (!folderResponse.ok) {
+          throw new Error(`Failed to fetch folder contents: ${folderResponse.status} ${folderResponse.statusText}`);
         }
-        const descriptions = await response.json();
+
+        const folderData = await folderResponse.json();
+        
+        if (!folderData.status || !folderData.response?.file_links || folderData.response.file_links.length === 0) {
+          throw new Error('No files found in the folder');
+        }
+
+        // Get the first JSON file (or the specific did_xml_params.json)
+        const jsonFile = folderData.response.file_links.find((file: any) => 
+          file.file_name.endsWith('.json')
+        ) || folderData.response.file_links[0];
+
+        if (!jsonFile) {
+          throw new Error('No JSON file found in the response');
+        }
+
+        // Now fetch the actual JSON content from the link
+        const descriptionsResponse = await fetch(jsonFile.link);
+        
+        if (!descriptionsResponse.ok) {
+          throw new Error(`Failed to fetch descriptions: ${descriptionsResponse.status} ${descriptionsResponse.statusText}`);
+        }
+
+        const descriptions = await descriptionsResponse.json();
         setParameterDescriptions(descriptions);
         setDescriptionsError(null);
+        console.log('✓ Parameter descriptions loaded from API');
       } catch (error) {
-        setDescriptionsError(`Failed to load parameter descriptions: ${error instanceof Error ? error.message : String(error)}`);
+        console.error('Error loading parameter descriptions:', error);
+        // Silently fallback to local file if API fails
+        try {
+          const localResponse = await fetch('/config/did_xml_params.json');
+          if (localResponse.ok) {
+            const descriptions = await localResponse.json();
+            setParameterDescriptions(descriptions);
+            setDescriptionsError(null);
+            console.log('✓ Parameter descriptions loaded from local file (API fallback)');
+          } else {
+            setDescriptionsError('Failed to load parameter descriptions from both API and local file');
+          }
+        } catch (localError) {
+          setDescriptionsError('Failed to load parameter descriptions');
+        }
       } finally {
         setIsLoadingDescriptions(false);
       }
@@ -63,8 +109,7 @@ const XMLEditor = () => {
       reader.onload = (e: any) => {
         try {
           const xmlDoc = parseXML(e.target.result);
-          const rootElement = xmlDoc.documentElement;
-          const xmlObject = xmlToObject(rootElement);
+          const xmlObject = xmlDocumentToObject(xmlDoc);
           const fileId = Date.now().toString() + Math.random().toString(36);
           const newFile: XMLFile = { 
             id: fileId, 
@@ -91,11 +136,11 @@ const XMLEditor = () => {
 
   const downloadXML = () => {
     if (!xmlData || !activeFileId) return;
-    
-    // Create timestamp in format: YYYYMMDD_HHMMSS
+
+    // Create timestamp in format: DDMMYYYY_HHMMSS
     const now = new Date();
-    const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
-    
+    const timestamp = `${String(now.getDate()).padStart(2, '0')}${String(now.getMonth() + 1).padStart(2, '0')}${now.getFullYear()}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+
     // Insert timestamp before file extension
     const nameParts = fileName.split('.');
     const extension = nameParts.pop();

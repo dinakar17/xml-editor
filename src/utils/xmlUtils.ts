@@ -11,21 +11,57 @@ export const parseXML = (xmlString: string): Document => {
   return xmlDoc;
 };
 
+// Convert XML document to JSON-like structure (preserving root comments)
+export const xmlDocumentToObject = (xmlDoc: Document): any => {
+  const rootComments: string[] = [];
+  
+  // Capture comments before the root element
+  for (const node of xmlDoc.childNodes) {
+    if (node.nodeType === Node.COMMENT_NODE) {
+      rootComments.push(node.textContent || '');
+    }
+  }
+  
+  const rootElement = xmlDoc.documentElement;
+  const obj = xmlToObject(rootElement);
+  
+  // Store root-level comments
+  obj.rootComments = rootComments;
+  
+  return obj;
+};
+
 // Convert XML element to JSON-like structure
 export const xmlToObject = (element: Element): any => {
   const obj: any = {
     tagName: element.tagName,
     attributes: {} as { [key: string]: string },
     children: [],
-    textContent: element.textContent?.trim() || ''
+    textContent: ''
   };
 
   for (const attr of element.attributes) {
     obj.attributes[attr.name] = attr.value;
   }
 
-  for (const child of element.children) {
-    obj.children.push(xmlToObject(child));
+  // Process all child nodes including comments, preserving order
+  for (const node of element.childNodes) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      obj.children.push(xmlToObject(node as Element));
+    } else if (node.nodeType === Node.COMMENT_NODE) {
+      // Store comments as special child objects
+      obj.children.push({
+        tagName: '__COMMENT__',
+        commentText: node.textContent || '',
+        attributes: {},
+        children: []
+      });
+    } else if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent?.trim() || '';
+      if (text) {
+        obj.textContent = text;
+      }
+    }
   }
 
   return obj;
@@ -34,7 +70,14 @@ export const xmlToObject = (element: Element): any => {
 // Convert object back to XML string
 export const objectToXML = (obj: any, depth = 0): string => {
   const indent = '  '.repeat(depth);
-  let xml = `${indent}<${obj.tagName}`;
+  let xml = '';
+  
+  // Handle comment nodes
+  if (obj.tagName === '__COMMENT__') {
+    return `${indent}<!--${obj.commentText}-->\n`;
+  }
+  
+  xml += `${indent}<${obj.tagName}`;
   
   for (const [key, value] of Object.entries(obj.attributes)) {
     xml += ` ${key}="${value}"`;
@@ -56,6 +99,13 @@ export const objectToXML = (obj: any, depth = 0): string => {
     }
     
     xml += `</${obj.tagName}>\n`;
+  }
+  
+  // Add root-level comments at the bottom (only at depth 0)
+  if (depth === 0 && obj.rootComments && obj.rootComments.length > 0) {
+    for (const comment of obj.rootComments) {
+      xml += `<!--${comment}-->\n`;
+    }
   }
   
   return xml;
