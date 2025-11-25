@@ -356,20 +356,6 @@ const XMLEditor = () => {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             <div className="lg:col-span-1 space-y-6">
               <FilesSidebar xmlFiles={xmlFiles} activeFileId={activeFileId} onFileSelect={handleFileSelect} onFileRemove={handleFileRemove} />
-              
-              {/* Changes Log */}
-              {fileChanges.length > 0 && (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                  <h3 className="text-lg font-semibold mb-3 text-gray-800">Changes Made</h3>
-                  <div className="max-h-64 overflow-y-auto space-y-2">
-                    {fileChanges.map((change, index) => (
-                      <div key={index} className="text-xs text-gray-600 p-2 bg-gray-50 rounded border-l-2 border-blue-500">
-                        {change}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
             
             <div className="lg:col-span-2">
@@ -414,8 +400,22 @@ const XMLEditor = () => {
               </div>
             </div>
             
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 space-y-6">
               <AttributeEditor selectedAttribute={selectedAttribute} parameterDescriptions={parameterDescriptions} onUpdateAttribute={updateAttribute} onClose={() => setSelectedAttribute(null)} onValueChange={(newValue) => setSelectedAttribute({ ...selectedAttribute, value: newValue })} />
+              
+              {/* Changes Log */}
+              {fileChanges.length > 0 && (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                  <h3 className="text-lg font-semibold mb-3 text-gray-800">Changes Made</h3>
+                  <div className="max-h-64 overflow-y-auto space-y-2">
+                    {fileChanges.map((change, index) => (
+                      <div key={index} className="text-xs text-gray-600 p-2 bg-gray-50 rounded border-l-2 border-blue-500">
+                        {change}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : !isLoadingXMLs ? (
