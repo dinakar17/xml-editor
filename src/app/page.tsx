@@ -1,14 +1,17 @@
 ﻿'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Download, Plus, FileText } from 'lucide-react';
+import { Upload, Download, Plus, FileText, Eye } from 'lucide-react';
+import { useNavigationGuard } from 'next-navigation-guard';
 import FilesSidebar from '@/components/FilesSidebar';
 import DescriptionsStatus from '@/components/DescriptionsStatus';
 import AddElementDialog from '@/components/AddElementDialog';
 import AddAttributeDialog from '@/components/AddAttributeDialog';
 import AttributeEditor from '@/components/AttributeEditor';
 import XMLElement from '@/components/XMLElement';
+import XMLViewerModal from '@/components/XMLViewerModal';
 import { parseXML, xmlDocumentToObject, objectToXML, getElementByPath } from '@/utils/xmlUtils';
+import { useAPILoader } from '@/hooks/useAPILoader';
 
 interface XMLFile {
   id: string;
@@ -19,87 +22,45 @@ interface XMLFile {
 }
 
 const XMLEditor = () => {
-  const [xmlFiles, setXmlFiles] = useState<XMLFile[]>([]);
+  // Use custom hook for API data loading
+  const {
+    parameterDescriptions,
+    isLoadingDescriptions,
+    descriptionsError,
+    xmlFiles,
+    isLoadingXMLs,
+    xmlLoadError,
+    setXmlFiles,
+  } = useAPILoader();
+
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [selectedElement, setSelectedElement] = useState<any>(null);
   const [selectedAttribute, setSelectedAttribute] = useState<any>(null);
-  const [parameterDescriptions, setParameterDescriptions] = useState<any>({});
-  const [isLoadingDescriptions, setIsLoadingDescriptions] = useState(true);
-  const [descriptionsError, setDescriptionsError] = useState<string | null>(null);
   const [showAddElement, setShowAddElement] = useState<any>(false);
   const [showAddAttribute, setShowAddAttribute] = useState<any>(false);
   const [editingFileName, setEditingFileName] = useState<boolean>(false);
+  const [showXMLViewer, setShowXMLViewer] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   
   const activeFile = xmlFiles.find(f => f.id === activeFileId);
   const xmlData = activeFile?.data || null;
   const fileName = activeFile?.name || '';
   const fileChanges = activeFile?.changes || [];
+  const hasChanges = xmlFiles.some(f => f.changes.length > 0);
 
+  // Use next-navigation-guard to prevent navigation when there are unsaved changes
+  useNavigationGuard({
+    enabled: hasChanges,
+    confirm: () => window.confirm('You have unsaved changes that will be lost. Are you sure you want to leave?')
+  });
+
+  // Set active file when xmlFiles are loaded
   useEffect(() => {
-    const loadParameterDescriptions = async () => {
-      try {
-        // First, get the file link from the API
-        const folderPath = encodeURIComponent('/BALNOSTICS/XMLEditor');
-        const folderResponse = await fetch(`https://abdrive.bajajauto.com/secure/user/file/download?folder_path=${folderPath}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': 'Bearer $2y$10$cHek8vAlpqqGKgZi1dA7/OEwq1gM9JPVV9QWg3h7TfEoNXct6XS8S'
-          }
-        });
+    if (xmlFiles.length > 0 && !activeFileId) {
+      setActiveFileId(xmlFiles[0].id);
+    }
+  }, [xmlFiles, activeFileId]);
 
-        if (!folderResponse.ok) {
-          throw new Error(`Failed to fetch folder contents: ${folderResponse.status} ${folderResponse.statusText}`);
-        }
-
-        const folderData = await folderResponse.json();
-        
-        if (!folderData.status || !folderData.response?.file_links || folderData.response.file_links.length === 0) {
-          throw new Error('No files found in the folder');
-        }
-
-        // Get the first JSON file (or the specific did_xml_params.json)
-        const jsonFile = folderData.response.file_links.find((file: any) => 
-          file.file_name.endsWith('.json')
-        ) || folderData.response.file_links[0];
-
-        if (!jsonFile) {
-          throw new Error('No JSON file found in the response');
-        }
-
-        // Now fetch the actual JSON content from the link
-        const descriptionsResponse = await fetch(jsonFile.link);
-        
-        if (!descriptionsResponse.ok) {
-          throw new Error(`Failed to fetch descriptions: ${descriptionsResponse.status} ${descriptionsResponse.statusText}`);
-        }
-
-        const descriptions = await descriptionsResponse.json();
-        setParameterDescriptions(descriptions);
-        setDescriptionsError(null);
-        console.log('✓ Parameter descriptions loaded from API');
-      } catch (error) {
-        console.error('Error loading parameter descriptions:', error);
-        // Silently fallback to local file if API fails
-        try {
-          const localResponse = await fetch('/config/did_xml_params.json');
-          if (localResponse.ok) {
-            const descriptions = await localResponse.json();
-            setParameterDescriptions(descriptions);
-            setDescriptionsError(null);
-            console.log('✓ Parameter descriptions loaded from local file (API fallback)');
-          } else {
-            setDescriptionsError('Failed to load parameter descriptions from both API and local file');
-          }
-        } catch (localError) {
-          setDescriptionsError('Failed to load parameter descriptions');
-        }
-      } finally {
-        setIsLoadingDescriptions(false);
-      }
-    };
-    loadParameterDescriptions();
-  }, []);
 
   const handleXmlUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -111,9 +72,22 @@ const XMLEditor = () => {
           const xmlDoc = parseXML(e.target.result);
           const xmlObject = xmlDocumentToObject(xmlDoc);
           const fileId = Date.now().toString() + Math.random().toString(36);
+          // Strip appended timestamp patterns like _YYYYMMDD_HHMMSS or _DDMMYYYY_HHMMSS before storing
+          const stripTimestampFromName = (name: string) => {
+            // split extension
+            const parts = name.split('.');
+            const ext = parts.length > 1 ? `.${parts.pop()}` : '';
+            const base = parts.join('.');
+            // regex for _YYYYMMDD_HHMMSS or _DDMMYYYY_HHMMSS (both with underscore separator)
+            const cleanedBase = base.replace(/_(?:20\d{2}\d{2}\d{2}|\d{2}\d{2}20\d{2})_\d{6}$/, '');
+            return cleanedBase + ext;
+          };
+
+          const cleanedName = stripTimestampFromName(file.name);
+
           const newFile: XMLFile = { 
             id: fileId, 
-            name: file.name, 
+            name: cleanedName, 
             data: xmlObject,
             originalData: JSON.parse(JSON.stringify(xmlObject)),
             changes: []
@@ -279,7 +253,29 @@ const XMLEditor = () => {
   const handleFileSelect = (fileId: string) => {
     setActiveFileId(fileId);
     setSelectedElement(null);
-    setSelectedAttribute(null);
+    
+    // Keep selectedAttribute open if the same element path and attribute exist in the new file
+    if (selectedAttribute) {
+      const newFile = xmlFiles.find(f => f.id === fileId);
+      if (newFile) {
+        try {
+          const element = getElementByPath(newFile.data, selectedAttribute.elementPath);
+          if (element && element.attributes && selectedAttribute.attributeName in element.attributes) {
+            // Update the value to reflect the new file's value
+            setSelectedAttribute({
+              ...selectedAttribute,
+              value: element.attributes[selectedAttribute.attributeName]
+            });
+          } else {
+            // Element path or attribute doesn't exist in new file, close editor
+            setSelectedAttribute(null);
+          }
+        } catch (error) {
+          // Element path doesn't exist in new file, close editor
+          setSelectedAttribute(null);
+        }
+      }
+    }
   };
 
   const handleFileRemove = (fileId: string) => {
@@ -323,6 +319,9 @@ const XMLEditor = () => {
                   <button onClick={downloadXML} className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center gap-2">
                     <Download className="w-4 h-4" />Download Modified XML
                   </button>
+                  <button onClick={() => setShowXMLViewer(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors flex items-center gap-2">
+                    <Eye className="w-4 h-4" />View XML
+                  </button>
                   <button onClick={() => setShowAddElement({ parentPath: [], parentElement: xmlData })} className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center gap-2">
                     <Plus className="w-4 h-4" />Add Root Element
                   </button>
@@ -334,6 +333,25 @@ const XMLEditor = () => {
           </div>
         </div>
         <DescriptionsStatus isLoading={isLoadingDescriptions} error={descriptionsError} descriptionsCount={Object.keys(parameterDescriptions).length} />
+        
+        {/* XML Loading Status */}
+        {isLoadingXMLs && (
+          <div className="bg-blue-50 rounded-lg shadow-sm border border-blue-200 p-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+              <span className="text-blue-800">Loading XML files from API...</span>
+            </div>
+          </div>
+        )}
+        
+        {xmlLoadError && (
+          <div className="bg-yellow-50 rounded-lg shadow-sm border border-yellow-200 p-4 mb-6">
+            <div className="flex items-center gap-2">
+              <span className="text-yellow-800">⚠️ {xmlLoadError}</span>
+            </div>
+          </div>
+        )}
+        
         {xmlData ? (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             <div className="lg:col-span-1 space-y-6">
@@ -372,13 +390,20 @@ const XMLEditor = () => {
                       autoFocus
                     />
                   ) : (
-                    <h2 
-                      className="flex-1 text-xl font-semibold cursor-pointer hover:text-blue-600 transition-colors"
-                      onClick={() => setEditingFileName(true)}
-                      title="Click to edit filename"
-                    >
-                      {fileName}
-                    </h2>
+                    <div className="flex items-center gap-2 flex-1">
+                      <h2 
+                        className="text-xl font-semibold cursor-pointer hover:text-blue-600 transition-colors"
+                        onClick={() => setEditingFileName(true)}
+                        title="Click to edit filename"
+                      >
+                        {fileName}
+                      </h2>
+                      {fileChanges.length > 0 && (
+                        <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                          Modified
+                        </span>
+                      )}
+                    </div>
                   )}
                 </div>
                 
@@ -393,18 +418,28 @@ const XMLEditor = () => {
               <AttributeEditor selectedAttribute={selectedAttribute} parameterDescriptions={parameterDescriptions} onUpdateAttribute={updateAttribute} onClose={() => setSelectedAttribute(null)} onValueChange={(newValue) => setSelectedAttribute({ ...selectedAttribute, value: newValue })} />
             </div>
           </div>
-        ) : (
+        ) : !isLoadingXMLs ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
             <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-600 mb-2">No XML File Loaded</h2>
-            <p className="text-gray-500 mb-6">Upload XML files to start editing parameters. You can upload multiple files at once.</p>
+            <p className="text-gray-500 mb-6">
+              {xmlLoadError 
+                ? 'Could not load XML files from API. Upload XML files manually to start editing parameters.' 
+                : 'Upload XML files to start editing parameters. You can upload multiple files at once.'}
+            </p>
             <button onClick={() => fileInputRef.current?.click()} className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto">
               <Upload className="w-5 h-5" />Choose XML Files
             </button>
           </div>
-        )}
+        ) : null}
         <AddElementDialog isOpen={!!showAddElement} onConfirm={handleAddElementConfirm} onCancel={() => setShowAddElement(false)} />
         <AddAttributeDialog isOpen={!!showAddAttribute} onConfirm={handleAddAttributeConfirm} onCancel={() => setShowAddAttribute(false)} />
+        <XMLViewerModal 
+          isOpen={showXMLViewer} 
+          xmlString={xmlData ? '<?xml version="1.0" encoding="UTF-8"?>\n' + objectToXML(xmlData) : ''} 
+          fileName={fileName}
+          onClose={() => setShowXMLViewer(false)} 
+        />
       </div>
     </div>
   );

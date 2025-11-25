@@ -12,8 +12,10 @@
     "@typescript-eslint/eslint-plugin": "^8.39.1",
     "lucide-react": "^0.539.0",
     "next": "15.4.6",
+    "next-navigation-guard": "^0.2.0",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "react-xml-viewer": "^3.0.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
