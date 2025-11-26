@@ -1,5 +1,6 @@
-import React from 'react';
-import { Edit, Info, Plus, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Edit, Info, Plus, Trash2, AlertCircle, CheckCircle } from 'lucide-react';
+import { validateAttributeValue, getValidationInfo } from '@/utils/validationUtils';
 
 interface AttributeEditorProps {
   selectedAttribute: {
@@ -20,6 +21,41 @@ const AttributeEditor: React.FC<AttributeEditorProps> = ({
   onClose,
   onValueChange,
 }) => {
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [localValue, setLocalValue] = useState('');
+
+  useEffect(() => {
+    if (selectedAttribute) {
+      setLocalValue(selectedAttribute.value);
+      // Validate initial value
+      const validation = validateAttributeValue(
+        selectedAttribute.attributeName,
+        selectedAttribute.value,
+        parameterDescriptions
+      );
+      setValidationError(validation.isValid ? null : validation.error || null);
+    }
+  }, [selectedAttribute, parameterDescriptions]);
+
+  const handleValueChange = (newValue: string) => {
+    setLocalValue(newValue);
+    
+    // Validate the new value
+    const validation = validateAttributeValue(
+      selectedAttribute!.attributeName,
+      newValue,
+      parameterDescriptions
+    );
+    
+    setValidationError(validation.isValid ? null : validation.error || null);
+    
+    // Only update if valid
+    if (validation.isValid) {
+      onUpdateAttribute(selectedAttribute!.elementPath, selectedAttribute!.attributeName, newValue);
+      onValueChange(newValue);
+    }
+  };
+
   if (!selectedAttribute) {
     return (
       <div className="bg-white border border-gray-200 rounded-lg p-6">
@@ -52,6 +88,7 @@ const AttributeEditor: React.FC<AttributeEditorProps> = ({
 
   const { elementPath, attributeName, value } = selectedAttribute;
   const description = parameterDescriptions[attributeName];
+  const validationInfo = getValidationInfo(attributeName, parameterDescriptions);
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6">
@@ -91,39 +128,68 @@ const AttributeEditor: React.FC<AttributeEditorProps> = ({
           </label>
           {description?.options ? (
             <select
-              value={value}
-              onChange={(e) => {
-                const newValue = e.target.value;
-                onUpdateAttribute(elementPath, attributeName, newValue);
-                onValueChange(newValue);
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              value={localValue}
+              onChange={(e) => handleValueChange(e.target.value)}
+              className={`w-full px-3 py-2 border rounded-md focus:ring-2 transition-colors ${
+                validationError 
+                  ? 'border-red-500 focus:ring-red-500' 
+                  : 'border-gray-300 focus:ring-blue-500'
+              }`}
             >
               {description.options.map((option: any) => (
                 <option key={option} value={option}>{option}</option>
               ))}
             </select>
           ) : (
-            <input
-              type="text"
-              value={value}
-              onChange={(e) => {
-                const newValue = e.target.value;
-                onUpdateAttribute(elementPath, attributeName, newValue);
-                onValueChange(newValue);
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter value..."
-            />
+            <>
+              <input
+                type="text"
+                value={localValue}
+                onChange={(e) => handleValueChange(e.target.value)}
+                className={`w-full px-3 py-2 border rounded-md focus:ring-2 transition-colors ${
+                  validationError 
+                    ? 'border-red-500 focus:ring-red-500' 
+                    : 'border-green-500 focus:ring-green-500'
+                }`}
+                placeholder={validationInfo.placeholder || 'Enter value...'}
+              />
+              {validationInfo.hint && !validationError && (
+                <p className="mt-1 text-xs text-gray-500 flex items-center gap-1">
+                  <Info className="w-3 h-3" />
+                  {validationInfo.hint}
+                </p>
+              )}
+            </>
+          )}
+          
+          {/* Validation feedback */}
+          {validationError && (
+            <div className="mt-2 flex items-start gap-2 text-sm text-red-600 bg-red-50 p-2 rounded">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>{validationError}</span>
+            </div>
+          )}
+          
+          {!validationError && localValue && (
+            <div className="mt-2 flex items-center gap-2 text-sm text-green-600">
+              <CheckCircle className="w-4 h-4" />
+              <span>Valid value</span>
+            </div>
           )}
         </div>
         
         <button
           onClick={onClose}
-          className="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+          disabled={!!validationError}
+          className={`w-full px-4 py-2 rounded-md transition-colors flex items-center justify-center gap-2 ${
+            validationError
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-green-600 text-white hover:bg-green-700'
+          }`}
+          title={validationError ? 'Fix validation errors before closing' : 'Done editing'}
         >
           <Edit className="w-4 h-4" />
-          Done Editing
+          {validationError ? 'Fix Errors to Continue' : 'Done Editing'}
         </button>
       </div>
     </div>

@@ -262,7 +262,11 @@
     "type": "text",
     "example": "B09",
     "maxLength": 3,
-    "minLength": 3
+    "minLength": 3,
+    "validation": {
+      "pattern": "^[A-Z][0-9]{2}$",
+      "message": "Must be exactly 3 characters: one uppercase letter followed by two digits (e.g., B09)"
+    }
   },
   "bin_first_char": {
     "title": "BIN First Character (Deprecated)",
@@ -270,7 +274,11 @@
     "type": "text",
     "example": "B",
     "maxLength": 1,
-    "minLength": 1
+    "minLength": 1,
+    "validation": {
+      "pattern": "^[A-Z]$",
+      "message": "Must be exactly 1 uppercase letter (e.g., B)"
+    }
   },
   "bin_third_char": {
     "title": "BIN Third Character (Deprecated)",
@@ -278,6 +286,10 @@
     "type": "text",
     "example": "9",
     "maxLength": 1,
-    "minLength": 1
+    "minLength": 1,
+    "validation": {
+      "pattern": "^[0-9]$",
+      "message": "Must be exactly 1 digit (0-9)"
+    }
   }
 }
