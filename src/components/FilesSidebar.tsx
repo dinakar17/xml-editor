@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, X, Search } from 'lucide-react';
+import { FileText, X, Search, Plus, Loader2 } from 'lucide-react';
 
 interface XMLFile {
   id: string;
@@ -12,6 +12,8 @@ interface FilesSidebarProps {
   activeFileId: string | null;
   onFileSelect: (fileId: string) => void;
   onFileRemove: (fileId: string) => void;
+  onLoadPartNumber: (partNo: string) => Promise<void>;
+  isLoadingPartNumber: boolean;
 }
 
 const FilesSidebar: React.FC<FilesSidebarProps> = ({
@@ -19,8 +21,17 @@ const FilesSidebar: React.FC<FilesSidebarProps> = ({
   activeFileId,
   onFileSelect,
   onFileRemove,
+  onLoadPartNumber,
+  isLoadingPartNumber,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [partNumber, setPartNumber] = useState('');
+
+  const handleLoadPartNumber = async () => {
+    if (!partNumber.trim()) return;
+    await onLoadPartNumber(partNumber.trim());
+    setPartNumber('');
+  };
 
   if (xmlFiles.length === 0) return null;
 
@@ -35,6 +46,38 @@ const FilesSidebar: React.FC<FilesSidebarProps> = ({
         <FileText className="w-5 h-5 text-blue-600" />
         XML Files ({filteredFiles.length}/{xmlFiles.length})
       </h3>
+      
+      {/* Part Number Input */}
+      <div className="mb-4 pb-4 border-b border-gray-200">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Load by Part Number
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Enter part number..."
+            value={partNumber}
+            onChange={(e) => setPartNumber(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleLoadPartNumber();
+            }}
+            disabled={isLoadingPartNumber}
+            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
+          />
+          <button
+            onClick={handleLoadPartNumber}
+            disabled={isLoadingPartNumber || !partNumber.trim()}
+            className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-1"
+            title="Load XML files for this part number"
+          >
+            {isLoadingPartNumber ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Plus className="w-4 h-4" />
+            )}
+          </button>
+        </div>
+      </div>
       
       {/* Search Bar */}
       <div className="relative mb-3">
@@ -58,7 +101,12 @@ const FilesSidebar: React.FC<FilesSidebarProps> = ({
       </div>
 
       <div className="space-y-2">
-        {filteredFiles.length > 0 ? (
+        {xmlFiles.length === 0 ? (
+          <div className="text-center py-6 text-sm text-gray-500">
+            <p>No XML files loaded.</p>
+            <p className="mt-2">Enter a part number above to load files.</p>
+          </div>
+        ) : filteredFiles.length > 0 ? (
           filteredFiles.map((file) => (
             <div
               key={file.id}

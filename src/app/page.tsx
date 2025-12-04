@@ -1,7 +1,8 @@
 ﻿'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Download, Plus, FileText, Eye } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Upload, Download, Plus, FileText, Eye, LogOut } from 'lucide-react';
 import { useNavigationGuard } from 'next-navigation-guard';
 import FilesSidebar from '@/components/FilesSidebar';
 import DescriptionsStatus from '@/components/DescriptionsStatus';
@@ -22,15 +23,26 @@ interface XMLFile {
 }
 
 const XMLEditor = () => {
+  const router = useRouter();
+  
+  // Check authentication on component mount
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      router.push('/login');
+    }
+  }, [router]);
+
   // Use custom hook for API data loading
   const {
     parameterDescriptions,
     isLoadingDescriptions,
     descriptionsError,
     xmlFiles,
-    isLoadingXMLs,
-    xmlLoadError,
+    isLoadingPartNumber,
+    loadPartNumberError,
     setXmlFiles,
+    loadXMLsByPartNumber,
   } = useAPILoader();
 
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
@@ -304,12 +316,42 @@ const XMLEditor = () => {
     }
   };
 
+  const handleLogout = () => {
+    if (hasChanges) {
+      const confirm = window.confirm('You have unsaved changes that will be lost. Are you sure you want to logout?');
+      if (!confirm) return;
+    }
+    
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('authTokenExpiry');
+    localStorage.removeItem('dealerCode');
+    localStorage.removeItem('environment');
+    router.push('/login');
+  };
+
+  const handleLoadPartNumber = async (partNo: string) => {
+    try {
+      await loadXMLsByPartNumber(partNo);
+    } catch (error: any) {
+      alert(`Error loading part ${partNo}: ${error.message}`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
           <div className="p-6 border-b border-gray-200">
-            <h1 className="text-2xl font-bold text-gray-800 mb-4">XML Parameter Editor</h1>
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-2xl font-bold text-gray-800">XML Parameter Editor</h1>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors flex items-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout
+              </button>
+            </div>
             <div className="flex flex-wrap gap-4 items-center">
               <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2">
                 <Upload className="w-4 h-4" />Upload XML Files
@@ -334,20 +376,11 @@ const XMLEditor = () => {
         </div>
         <DescriptionsStatus isLoading={isLoadingDescriptions} error={descriptionsError} descriptionsCount={Object.keys(parameterDescriptions).length} />
         
-        {/* XML Loading Status */}
-        {isLoadingXMLs && (
-          <div className="bg-blue-50 rounded-lg shadow-sm border border-blue-200 p-4 mb-6">
-            <div className="flex items-center gap-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-              <span className="text-blue-800">Loading XML files from API...</span>
-            </div>
-          </div>
-        )}
-        
-        {xmlLoadError && (
-          <div className="bg-yellow-50 rounded-lg shadow-sm border border-yellow-200 p-4 mb-6">
+        {/* Part Number Loading Error */}
+        {loadPartNumberError && (
+          <div className="bg-red-50 rounded-lg shadow-sm border border-red-200 p-4 mb-6">
             <div className="flex items-center gap-2">
-              <span className="text-yellow-800">⚠️ {xmlLoadError}</span>
+              <span className="text-red-800">❌ {loadPartNumberError}</span>
             </div>
           </div>
         )}
@@ -355,7 +388,14 @@ const XMLEditor = () => {
         {xmlData ? (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             <div className="lg:col-span-1 space-y-6">
-              <FilesSidebar xmlFiles={xmlFiles} activeFileId={activeFileId} onFileSelect={handleFileSelect} onFileRemove={handleFileRemove} />
+              <FilesSidebar 
+                xmlFiles={xmlFiles} 
+                activeFileId={activeFileId} 
+                onFileSelect={handleFileSelect} 
+                onFileRemove={handleFileRemove}
+                onLoadPartNumber={handleLoadPartNumber}
+                isLoadingPartNumber={isLoadingPartNumber}
+              />
             </div>
             
             <div className="lg:col-span-2">
@@ -418,20 +458,20 @@ const XMLEditor = () => {
               )}
             </div>
           </div>
-        ) : !isLoadingXMLs ? (
+        ) : (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
             <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-600 mb-2">No XML File Loaded</h2>
             <p className="text-gray-500 mb-6">
-              {xmlLoadError 
-                ? 'Could not load XML files from API. Upload XML files manually to start editing parameters.' 
-                : 'Upload XML files to start editing parameters. You can upload multiple files at once.'}
+              Enter a part number in the sidebar to load XML files, or upload XML files manually to start editing parameters.
             </p>
-            <button onClick={() => fileInputRef.current?.click()} className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto">
-              <Upload className="w-5 h-5" />Choose XML Files
-            </button>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <button onClick={() => fileInputRef.current?.click()} className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2">
+                <Upload className="w-5 h-5" />Upload XML Files
+              </button>
+            </div>
           </div>
-        ) : null}
+        )}
         <AddElementDialog isOpen={!!showAddElement} onConfirm={handleAddElementConfirm} onCancel={() => setShowAddElement(false)} />
         <AddAttributeDialog isOpen={!!showAddAttribute} onConfirm={handleAddAttributeConfirm} onCancel={() => setShowAddAttribute(false)} />
         <XMLViewerModal 
