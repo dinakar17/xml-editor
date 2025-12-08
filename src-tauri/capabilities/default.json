@@ -9,6 +9,7 @@
     "core:window:allow-center",
     "core:window:allow-close",
     "dialog:allow-save",
+    "dialog:allow-message",
     "fs:allow-write-text-file",
     {
       "identifier": "http:default",
