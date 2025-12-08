@@ -1,8 +1,8 @@
 ﻿'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, Download, Plus, FileText, Eye, LogOut } from 'lucide-react';
+import { Upload, Download, Plus, FileText, Eye, LogOut, Search, ChevronUp, ChevronDown } from 'lucide-react';
 import { useNavigationGuard } from 'next-navigation-guard';
 import FilesSidebar from '@/components/FilesSidebar';
 import DescriptionsStatus from '@/components/DescriptionsStatus';
@@ -20,6 +20,7 @@ interface XMLFile {
   data: any;
   originalData?: any;
   changes: string[];
+  partNumber?: string;
 }
 
 const XMLEditor = () => {
@@ -52,6 +53,9 @@ const XMLEditor = () => {
   const [showAddAttribute, setShowAddAttribute] = useState<any>(false);
   const [editingFileName, setEditingFileName] = useState<boolean>(false);
   const [showXMLViewer, setShowXMLViewer] = useState<boolean>(false);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<{path: number[], type: 'element' | 'attribute', name: string, value?: string}[]>([]);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   
   const activeFile = xmlFiles.find(f => f.id === activeFileId);
@@ -288,14 +292,39 @@ const XMLEditor = () => {
     addChangeLog(`Deleted attribute "${attributeName}=${deletedValue}" from <${element.tagName}>`);
   };
 
+  // Helper function to find the first occurrence of an attribute by name in XML tree
+  const findAttributeInXML = (element: any, attributeName: string, path: number[] = []): { elementPath: number[], value: string } | null => {
+    // Check if current element has the attribute
+    if (element.attributes && attributeName in element.attributes) {
+      return {
+        elementPath: path,
+        value: element.attributes[attributeName]
+      };
+    }
+
+    // Recursively search in children
+    if (element.children) {
+      for (let i = 0; i < element.children.length; i++) {
+        const result = findAttributeInXML(element.children[i], attributeName, [...path, i]);
+        if (result) return result;
+      }
+    }
+
+    return null;
+  };
+
   const handleFileSelect = (fileId: string) => {
     setActiveFileId(fileId);
     setSelectedElement(null);
     
-    // Keep selectedAttribute open if the same element path and attribute exist in the new file
+    // Clear search when switching files
+    clearSearch();
+    
+    // Keep selectedAttribute open if the same attribute exists anywhere in the new file
     if (selectedAttribute) {
       const newFile = xmlFiles.find(f => f.id === fileId);
       if (newFile) {
+        // First, try to find the attribute at the same element path
         try {
           const element = getElementByPath(newFile.data, selectedAttribute.elementPath);
           if (element && element.attributes && selectedAttribute.attributeName in element.attributes) {
@@ -304,12 +333,22 @@ const XMLEditor = () => {
               ...selectedAttribute,
               value: element.attributes[selectedAttribute.attributeName]
             });
-          } else {
-            // Element path or attribute doesn't exist in new file, close editor
-            setSelectedAttribute(null);
+            return;
           }
         } catch (error) {
-          // Element path doesn't exist in new file, close editor
+          // Element path doesn't exist, continue to search elsewhere
+        }
+
+        // If not found at same path, search for the attribute anywhere in the XML
+        const foundAttribute = findAttributeInXML(newFile.data, selectedAttribute.attributeName);
+        if (foundAttribute) {
+          setSelectedAttribute({
+            elementPath: foundAttribute.elementPath,
+            attributeName: selectedAttribute.attributeName,
+            value: foundAttribute.value
+          });
+        } else {
+          // Attribute doesn't exist anywhere in new file, close editor
           setSelectedAttribute(null);
         }
       }
@@ -358,10 +397,75 @@ const XMLEditor = () => {
   const handleLoadPartNumber = async (partNo: string) => {
     try {
       await loadXMLsByPartNumber(partNo);
+      return true; // Success
     } catch (error: any) {
       alert(`Error loading part ${partNo}: ${error.message}`);
+      return false; // Failure
     }
   };
+
+  // Search functionality - memoize to prevent recreation on every render
+  const searchInXML = useCallback((element: any, path: number[] = [], results: any[] = [], searchQuery: string) => {
+    if (!searchQuery.trim()) return results;
+
+    const search = searchQuery.toLowerCase();
+
+    // Search in element tag name
+    if (element.tagName && element.tagName.toLowerCase().includes(search)) {
+      results.push({ path: [...path], type: 'element', name: element.tagName });
+    }
+
+    // Search in attributes
+    if (element.attributes) {
+      Object.entries(element.attributes).forEach(([key, value]) => {
+        if (key.toLowerCase().includes(search) || String(value).toLowerCase().includes(search)) {
+          results.push({ path: [...path], type: 'attribute', name: key, value: String(value) });
+        }
+      });
+    }
+
+    // Search in text content
+    if (element.textContent && element.textContent.toLowerCase().includes(search)) {
+      results.push({ path: [...path], type: 'element', name: element.tagName });
+    }
+
+    // Recursively search children
+    if (element.children) {
+      element.children.forEach((child: any, index: number) => {
+        searchInXML(child, [...path, index], results, searchQuery);
+      });
+    }
+
+    return results;
+  }, []);
+
+  const handleSearch = useCallback(() => {
+    if (!xmlData || !searchTerm.trim()) {
+      setSearchResults([]);
+      setCurrentSearchIndex(0);
+      return;
+    }
+
+    const results = searchInXML(xmlData, [], [], searchTerm);
+    setSearchResults(results);
+    setCurrentSearchIndex(0);
+  }, [xmlData, searchTerm, searchInXML]);
+
+  const navigateSearch = useCallback((direction: 'next' | 'prev') => {
+    if (searchResults.length === 0) return;
+
+    if (direction === 'next') {
+      setCurrentSearchIndex((prev) => (prev + 1) % searchResults.length);
+    } else {
+      setCurrentSearchIndex((prev) => (prev - 1 + searchResults.length) % searchResults.length);
+    }
+  }, [searchResults.length]);
+
+  const clearSearch = useCallback(() => {
+    setSearchTerm('');
+    setSearchResults([]);
+    setCurrentSearchIndex(0);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -426,9 +530,9 @@ const XMLEditor = () => {
           {xmlData ? (
             <>
               <div className="lg:col-span-2">
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                 {/* Inline File Name Editor */}
-                <div className="mb-4 flex items-center gap-2">
+                <div className="mb-3 flex items-center gap-2">
                   {editingFileName ? (
                     <input
                       type="text"
@@ -439,20 +543,20 @@ const XMLEditor = () => {
                         if (e.key === 'Enter') setEditingFileName(false);
                         if (e.key === 'Escape') setEditingFileName(false);
                       }}
-                      className="flex-1 px-3 py-1 text-lg font-semibold border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 px-3 py-1 text-base font-semibold border border-blue-500 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                       autoFocus
                     />
                   ) : (
                     <div className="flex items-center gap-2 flex-1">
                       <h2 
-                        className="text-xl font-semibold cursor-pointer hover:text-blue-600 transition-colors"
+                        className="text-lg font-semibold cursor-pointer hover:text-blue-600 transition-colors"
                         onClick={() => setEditingFileName(true)}
                         title="Click to edit filename"
                       >
                         {fileName}
                       </h2>
                       {fileChanges.length > 0 && (
-                        <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                        <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
                           Modified
                         </span>
                       )}
@@ -460,23 +564,86 @@ const XMLEditor = () => {
                   )}
                 </div>
                 
-                <h3 className="text-lg font-medium mb-3 text-gray-700">XML Structure</h3>
-                <div className="max-h-96 overflow-y-auto">
-                  <XMLElement element={xmlData} path={[]} parameterDescriptions={parameterDescriptions} onAttributeClick={(elementPath, attributeName, value) => setSelectedAttribute({ elementPath, attributeName, value })} onDeleteAttribute={deleteAttribute} onDeleteElement={deleteElement} onShowAddAttribute={(elementPath, element) => setShowAddAttribute({ elementPath, element })} onShowAddElement={(parentPath, parentElement) => setShowAddElement({ parentPath, parentElement })} />
+                <h3 className="text-base font-medium mb-2 text-gray-700">XML Structure</h3>
+                
+                {/* Search Bar */}
+                <div className="mb-3 flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search elements, attributes, values..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSearch();
+                        if (e.key === 'Escape') clearSearch();
+                      }}
+                      className="w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <button
+                    onClick={handleSearch}
+                    className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                  >
+                    Search
+                  </button>
+                  {searchResults.length > 0 && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm text-gray-600">
+                        {currentSearchIndex + 1}/{searchResults.length}
+                      </span>
+                      <button
+                        onClick={() => navigateSearch('prev')}
+                        className="p-1 text-gray-600 hover:bg-gray-100 rounded"
+                        title="Previous result"
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => navigateSearch('next')}
+                        className="p-1 text-gray-600 hover:bg-gray-100 rounded"
+                        title="Next result"
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={clearSearch}
+                        className="px-2 py-1 text-sm text-red-600 hover:bg-red-100 rounded"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="max-h-[calc(100vh-280px)] overflow-y-auto">
+                  <XMLElement 
+                    element={xmlData} 
+                    path={[]} 
+                    parameterDescriptions={parameterDescriptions} 
+                    onAttributeClick={(elementPath, attributeName, value) => setSelectedAttribute({ elementPath, attributeName, value })} 
+                    onDeleteAttribute={deleteAttribute} 
+                    onDeleteElement={deleteElement} 
+                    onShowAddAttribute={(elementPath, element) => setShowAddAttribute({ elementPath, element })} 
+                    onShowAddElement={(parentPath, parentElement) => setShowAddElement({ parentPath, parentElement })}
+                    searchResults={searchResults}
+                    currentSearchIndex={currentSearchIndex}
+                  />
                 </div>
               </div>
             </div>
             
-            <div className="lg:col-span-1 space-y-6">
+            <div className="lg:col-span-1 space-y-4">
               <AttributeEditor selectedAttribute={selectedAttribute} parameterDescriptions={parameterDescriptions} onUpdateAttribute={updateAttribute} onClose={() => setSelectedAttribute(null)} onValueChange={(newValue) => setSelectedAttribute({ ...selectedAttribute, value: newValue })} />
               
               {/* Changes Log */}
               {fileChanges.length > 0 && (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                  <h3 className="text-lg font-semibold mb-3 text-gray-800">Changes Made</h3>
-                  <div className="max-h-64 overflow-y-auto space-y-2">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3">
+                  <h3 className="text-base font-semibold mb-2 text-gray-800">Changes Made</h3>
+                  <div className="max-h-80 overflow-y-auto space-y-1.5">
                     {fileChanges.map((change, index) => (
-                      <div key={index} className="text-xs text-gray-600 p-2 bg-gray-50 rounded border-l-2 border-blue-500">
+                      <div key={index} className="text-xs text-gray-600 p-1.5 bg-gray-50 rounded border-l-2 border-blue-500">
                         {change}
                       </div>
                     ))}

@@ -9,6 +9,7 @@ interface XMLFile {
   data: any;
   originalData?: any;
   changes: string[];
+  partNumber?: string;
 }
 
 interface UseAPILoaderReturn {
@@ -58,9 +59,9 @@ export const useAPILoader = (): UseAPILoaderReturn => {
       const response = await FMSApi({
         url: url.pathname + url.search,
         method: "GET",
-        headers: { 
+        headers: {
           Authorization: `Bearer ${authToken}`,
-          Accept: "application/json"
+          Accept: "application/json",
         },
       });
 
@@ -99,6 +100,7 @@ export const useAPILoader = (): UseAPILoaderReturn => {
               data: xmlObject,
               originalData: JSON.parse(JSON.stringify(xmlObject)),
               changes: [],
+              partNumber: partNo,
             });
           }
         } catch (error) {
@@ -124,6 +126,7 @@ export const useAPILoader = (): UseAPILoaderReturn => {
               data: xmlObject,
               originalData: JSON.parse(JSON.stringify(xmlObject)),
               changes: [],
+              partNumber: partNo,
             });
           }
         } catch (error) {
@@ -149,6 +152,7 @@ export const useAPILoader = (): UseAPILoaderReturn => {
               data: xmlObject,
               originalData: JSON.parse(JSON.stringify(xmlObject)),
               changes: [],
+              partNumber: partNo,
             });
           }
         } catch (error) {
@@ -165,7 +169,7 @@ export const useAPILoader = (): UseAPILoaderReturn => {
         throw new Error(`No XML files available for part number: ${partNo}`);
       }
     } catch (error: any) {
-      console.error("Error loading XML files by part number:", error);
+      console.error("Error loading XML files by part number:", error.message);
       setLoadPartNumberError(error.message || "Failed to load XML files");
       throw error;
     } finally {
@@ -179,7 +183,7 @@ export const useAPILoader = (): UseAPILoaderReturn => {
         // First, get the file link from the API
         const folderPath = encodeURIComponent("/BALNOSTICS/XMLEditor");
         const folderUrl = `${API_BASE_URL}?folder_path=${folderPath}`;
-        
+
         const folderResponse = await fetch(folderUrl, {
           method: "GET",
           headers: {
