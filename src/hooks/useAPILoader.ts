@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { FMSApi } from "@/api/fms";
+import { fetch } from "@tauri-apps/plugin-http";
 import { parseXML, xmlDocumentToObject } from "@/utils/xmlUtils";
 
 interface XMLFile {
@@ -49,21 +50,35 @@ export const useAPILoader = (): UseAPILoaderReturn => {
         throw new Error("Not authenticated. Please login first.");
       }
 
-      // Fetch ECU details
-      const response = await FMSApi.get("/api/v4/ecu/details", {
-        params: { part_no: partNo },
-        headers: { Authorization: `Bearer ${authToken}` },
+      // Build URL with query params
+      const url = new URL("/api/v4/ecu/details", window.location.origin);
+      url.searchParams.append("part_no", partNo);
+
+      // Fetch ECU details using FMSApi
+      const response = await FMSApi({
+        url: url.pathname + url.search,
+        method: "GET",
+        headers: { 
+          Authorization: `Bearer ${authToken}`,
+          Accept: "application/json"
+        },
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const responseData = await response.json();
+
       if (
-        !response.data.status ||
-        !response.data.data ||
-        response.data.data.length === 0
+        !responseData.status ||
+        !responseData.data ||
+        responseData.data.length === 0
       ) {
         throw new Error(`No ECU details found for part number: ${partNo}`);
       }
 
-      const ecuData = response.data.data[0];
+      const ecuData = responseData.data[0];
       const loadedFiles: XMLFile[] = [];
 
       // Load UDS DID List XML
@@ -163,15 +178,14 @@ export const useAPILoader = (): UseAPILoaderReturn => {
       try {
         // First, get the file link from the API
         const folderPath = encodeURIComponent("/BALNOSTICS/XMLEditor");
-        const folderResponse = await fetch(
-          `${API_BASE_URL}?folder_path=${folderPath}`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: API_TOKEN,
-            },
-          }
-        );
+        const folderUrl = `${API_BASE_URL}?folder_path=${folderPath}`;
+        
+        const folderResponse = await fetch(folderUrl, {
+          method: "GET",
+          headers: {
+            Authorization: API_TOKEN,
+          },
+        });
 
         if (!folderResponse.ok) {
           throw new Error(
@@ -238,7 +252,6 @@ export const useAPILoader = (): UseAPILoaderReturn => {
     };
 
     loadParameterDescriptions();
-    // Removed automatic XML loading - user will load by part number
   }, []);
 
   return {

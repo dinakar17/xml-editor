@@ -1,5 +1,5 @@
 import useSWRMutation from "swr/mutation";
-import axios from "axios";
+import { fetch } from "@tauri-apps/plugin-http";
 import { getWhoAmI } from "@/lib/who-am-i";
 
 export type Environment = "test" | "dev" | "uat" | "prod";
@@ -22,7 +22,7 @@ interface LoginResponse extends BaseResponse {
 }
 
 const ENV_URLS: Record<Environment, string> = {
-  test: "https://key-server.fms.appmaaza.com/",
+  test: "https://key-server.fms.appmaaza.com",
   dev: "https://fmsdev.bajajauto.co.in",
   uat: "https://fmsuat.bajajauto.com",
   prod: "https://fms.bajajauto.com",
@@ -42,25 +42,24 @@ async function loginMutation(
   const token = await getWhoAmI();
   const baseURL = ENV_URLS[arg.environment];
 
-  // Create a temporary axios instance with the selected environment URL
-  const api = axios.create({
-    baseURL,
-    timeout: 60_000,
+  // Build full URL with query parameters
+  const fullUrl = new URL(url, baseURL);
+  fullUrl.searchParams.append("serial_number", arg.serial_number);
+  fullUrl.searchParams.append("password", arg.password);
+
+  const response = await fetch(fullUrl.toString(), {
+    method: "POST",
     headers: {
       Accept: "application/json",
+      Authorization: `Bearer ${token}`,
     },
+    body: JSON.stringify({}), // Empty body for POST request
   });
 
-  const response = await api.post(
-    url,
-    {},
-    {
-      headers: { Authorization: `Bearer ${token}` },
-      params: {
-        serial_number: arg.serial_number,
-        password: arg.password,
-      },
-    }
-  );
-  return response.data;
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const data: LoginResponse = await response.json();
+  return data;
 }

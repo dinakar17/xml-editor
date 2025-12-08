@@ -1,0 +1,24 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "enables the default permissions",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-create",
+    "core:window:allow-center",
+    "core:window:allow-close",
+    "dialog:allow-save",
+    "fs:allow-write-text-file",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://key-server.fms.appmaaza.com/*" },
+        { "url": "https://fmsdev.bajajauto.co.in/*" },
+        { "url": "https://fmsuat.bajajauto.com/*" },
+        { "url": "https://fms.bajajauto.com/*" },
+        { "url": "https://abdrive.bajajauto.com/*" }
+      ]
+    }
+  ]
+}

@@ -30,10 +30,8 @@ const FilesSidebar: React.FC<FilesSidebarProps> = ({
   const handleLoadPartNumber = async () => {
     if (!partNumber.trim()) return;
     await onLoadPartNumber(partNumber.trim());
-    setPartNumber('');
+    // Keep the part number value for appending more searches
   };
-
-  if (xmlFiles.length === 0) return null;
 
   // Filter files based on search query
   const filteredFiles = xmlFiles.filter(file =>
@@ -55,7 +53,7 @@ const FilesSidebar: React.FC<FilesSidebarProps> = ({
         <div className="flex gap-2">
           <input
             type="text"
-            placeholder="Enter part number..."
+            placeholder="Enter part number to search..."
             value={partNumber}
             onChange={(e) => setPartNumber(e.target.value)}
             onKeyDown={(e) => {

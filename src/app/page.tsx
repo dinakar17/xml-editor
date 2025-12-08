@@ -120,7 +120,7 @@ const XMLEditor = () => {
     event.target.value = '';
   };
 
-  const downloadXML = () => {
+  const downloadXML = async () => {
     if (!xmlData || !activeFileId) return;
 
     // Create timestamp in format: DDMMYYYY_HHMMSS
@@ -133,18 +133,44 @@ const XMLEditor = () => {
     const baseName = nameParts.join('.');
     const downloadName = `${baseName}_${timestamp}.${extension}`;
     
-    // Direct download without popup
     const xmlString = '<?xml version="1.0" encoding="UTF-8"?>\n' + objectToXML(xmlData);
-    const blob = new Blob([xmlString], { type: 'application/xml' });
-    const url = URL.createObjectURL(blob);
     
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = downloadName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Check if running in Tauri
+    if (typeof window !== 'undefined' && '__TAURI__' in window) {
+      try {
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+        
+        // Open save dialog
+        const filePath = await save({
+          defaultPath: downloadName,
+          filters: [{
+            name: 'XML',
+            extensions: ['xml']
+          }]
+        });
+        
+        if (filePath) {
+          await writeTextFile(filePath, xmlString);
+          alert(`File saved successfully to ${filePath}`);
+        }
+      } catch (error: any) {
+        console.error('Error saving file:', error);
+        alert(`Error saving file: ${error.message}`);
+      }
+    } else {
+      // Fallback for browser (development mode)
+      const blob = new Blob([xmlString], { type: 'application/xml' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = downloadName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
   };
 
   const updateActiveFileData = (newData: any) => {
@@ -385,21 +411,22 @@ const XMLEditor = () => {
           </div>
         )}
         
-        {xmlData ? (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <div className="lg:col-span-1 space-y-6">
-              <FilesSidebar 
-                xmlFiles={xmlFiles} 
-                activeFileId={activeFileId} 
-                onFileSelect={handleFileSelect} 
-                onFileRemove={handleFileRemove}
-                onLoadPartNumber={handleLoadPartNumber}
-                isLoadingPartNumber={isLoadingPartNumber}
-              />
-            </div>
-            
-            <div className="lg:col-span-2">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-1 space-y-6">
+            <FilesSidebar 
+              xmlFiles={xmlFiles} 
+              activeFileId={activeFileId} 
+              onFileSelect={handleFileSelect} 
+              onFileRemove={handleFileRemove}
+              onLoadPartNumber={handleLoadPartNumber}
+              isLoadingPartNumber={isLoadingPartNumber}
+            />
+          </div>
+          
+          {xmlData ? (
+            <>
+              <div className="lg:col-span-2">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 {/* Inline File Name Editor */}
                 <div className="mb-4 flex items-center gap-2">
                   {editingFileName ? (
@@ -457,21 +484,22 @@ const XMLEditor = () => {
                 </div>
               )}
             </div>
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-600 mb-2">No XML File Loaded</h2>
-            <p className="text-gray-500 mb-6">
-              Enter a part number in the sidebar to load XML files, or upload XML files manually to start editing parameters.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <button onClick={() => fileInputRef.current?.click()} className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2">
-                <Upload className="w-5 h-5" />Upload XML Files
-              </button>
+            </>
+          ) : (
+            <div className="lg:col-span-3 bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+              <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold text-gray-600 mb-2">No XML File Loaded</h2>
+              <p className="text-gray-500 mb-6">
+                Enter a part number in the sidebar to load XML files, or upload XML files manually to start editing parameters.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <button onClick={() => fileInputRef.current?.click()} className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2">
+                  <Upload className="w-5 h-5" />Upload XML Files
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
         <AddElementDialog isOpen={!!showAddElement} onConfirm={handleAddElementConfirm} onCancel={() => setShowAddElement(false)} />
         <AddAttributeDialog isOpen={!!showAddAttribute} onConfirm={handleAddAttributeConfirm} onCancel={() => setShowAddAttribute(false)} />
         <XMLViewerModal 

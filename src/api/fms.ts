@@ -1,12 +1,8 @@
-import axios, {
-  type AxiosInstance,
-  type AxiosRequestConfig,
-  type AxiosResponse,
-} from "axios";
+import { fetch } from "@tauri-apps/plugin-http";
 
 // Environment URLs mapping
 const ENV_URLS = {
-  test: "https://key-server.fms.appmaaza.com/",
+  test: "https://key-server.fms.appmaaza.com",
   dev: "https://fmsdev.bajajauto.co.in",
   uat: "https://fmsuat.bajajauto.com",
   prod: "https://fms.bajajauto.com",
@@ -30,8 +26,14 @@ export const BASEURL = getBaseURL();
 
 console.log(`FMS API Base URL: ${BASEURL}`);
 
-interface FMSApiConfig extends AxiosRequestConfig {
-  method?: string;
+// Using standard RequestInit from fetch API
+interface FMSApiOptions extends RequestInit {
+  url: string;
+  timeout?: number;
+}
+
+interface FMSApiConfig {
+  method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   url?: string;
   headers?: Record<string, string>;
   data?: unknown;
@@ -39,111 +41,83 @@ interface FMSApiConfig extends AxiosRequestConfig {
   timeout?: number;
 }
 
-// Extended config type for request timing
-interface AxiosConfigWithTiming extends AxiosRequestConfig {
-  requestStartTime?: number;
-}
-
 /**
  * FMS API Client
- * Axios instance configured for FMS backend
- * Dynamically updates baseURL based on stored environment
+ * Wrapper around Tauri's fetch for FMS backend
  */
-export const FMSApi: AxiosInstance = axios.create({
-  baseURL: BASEURL,
-  timeout: 60_000,
-  headers: {
-    Accept: "application/json",
-  },
-});
+export const FMSApi = async (config: FMSApiOptions): Promise<Response> => {
+  const requestStartTime = Date.now();
 
-// Update baseURL when environment changes
-if (typeof window !== "undefined") {
-  const updateBaseURL = () => {
-    const storedEnv = localStorage.getItem("environment") as
-      | keyof typeof ENV_URLS
-      | null;
-    if (storedEnv && ENV_URLS[storedEnv]) {
-      FMSApi.defaults.baseURL = ENV_URLS[storedEnv];
-      console.log(`[FMS API] Base URL updated to: ${ENV_URLS[storedEnv]}`);
-    }
-  };
+  // Build full URL
+  const baseURL = getBaseURL();
+  const fullUrl = config.url.startsWith("http")
+    ? config.url
+    : `${baseURL}${config.url}`;
 
-  // Update on storage changes (e.g., after login)
-  window.addEventListener("storage", updateBaseURL);
-}
+  console.log(`[FMS API] ${config.method || "GET"} ${fullUrl}`);
 
-// Request interceptor for logging
-FMSApi.interceptors.request.use(
-  (config) => {
-    console.log(`[FMS API] ${config.method?.toUpperCase()} ${config.url}`);
-    return config;
-  },
-  (error) => {
-    console.error("[FMS API] Request error:", error);
-    return Promise.reject(error);
-  }
-);
+  try {
+    const response = await fetch(fullUrl, {
+      ...config,
+      headers: {
+        Accept: "application/json",
+        ...config.headers,
+      },
+    });
 
-// Response interceptor for logging and error handling
-FMSApi.interceptors.response.use(
-  (response) => {
-    const config = response.config as AxiosConfigWithTiming;
-    const duration = Date.now() - (config.requestStartTime ?? Date.now());
+    const duration = Date.now() - requestStartTime;
     if (duration > 5000) {
-      console.warn(
-        `[FMS API] Slow response (${duration}ms): ${response.config.url}`
-      );
+      console.warn(`[FMS API] Slow response (${duration}ms): ${fullUrl}`);
     }
-    return response;
-  },
-  (error) => {
-    if (error.response?.status === 401) {
+
+    if (!response.ok && response.status === 401) {
       console.error("[FMS API] Unauthorized - logging out");
       // TODO: Handle logout
     }
 
-    const config = error.config as AxiosConfigWithTiming | undefined;
-    const duration = Date.now() - (config?.requestStartTime ?? Date.now());
+    return response;
+  } catch (error) {
+    const duration = Date.now() - requestStartTime;
     console.error(`[FMS API] Error (${duration}ms):`, {
-      url: error.config?.url,
-      status: error.response?.status,
-      message: error.message,
+      url: fullUrl,
+      error,
     });
-
-    return Promise.reject(error);
+    throw error;
   }
-);
-
-// Add timestamp to requests for performance monitoring
-FMSApi.interceptors.request.use((config) => {
-  const configWithTiming = config as AxiosConfigWithTiming;
-  configWithTiming.requestStartTime = Date.now();
-  return config;
-});
+};
 
 /**
  * Legacy FMS API function for backward compatibility
- * @deprecated Use FMSApi axios instance directly
+ * @deprecated Use FMSApi function directly
  */
 export default async function fmsApiLegacy({
-  method = "get",
+  method = "GET",
   url = "",
   headers = {},
   data = {},
   params = {},
-  validateStatus = (status: number) => status >= 200 && status < 300,
   timeout = 60_000,
-}: FMSApiConfig): Promise<AxiosResponse> {
-  const config: AxiosRequestConfig = {
+}: FMSApiConfig): Promise<Response> {
+  const baseURL = getBaseURL();
+  const fullUrl = url.startsWith("http") ? url : `${baseURL}${url}`;
+
+  // Build query string
+  const urlWithParams = new URL(fullUrl);
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      urlWithParams.searchParams.append(key, String(value));
+    });
+  }
+
+  const requestConfig: FMSApiOptions = {
+    url: urlWithParams.toString(),
     method,
-    url,
     headers: { Accept: "application/json", ...headers },
-    data: method === "get" ? undefined : data,
-    params,
-    validateStatus,
-    timeout,
+    body: method === "GET" ? undefined : JSON.stringify(data),
   };
 
-  return await FMSApi(config);
+  // Add timeout to config if supported by your Tauri version
+  // Note: timeout might need to be passed differently depending on plugin version
+
+  return await FMSApi(requestConfig);
 }
